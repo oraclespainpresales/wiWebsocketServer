@@ -297,20 +297,22 @@ async.series([
     }, (err) => {
       next();
     });
-  },
+  }
+/**
   function(next) {
     restserver.listen(RESTPORT, function() {
       log.info(REST,"REST server running on http://localhost:" + RESTPORT + restURI);
       next();
     });
   }
+**/
 ], function(err, results) {
   if (err) {
     log.error("", err.message);
     process.exit(2);
   }
 });
-
+/**
 restapp.post(restURI, function(req,res) {
   res.status(204).send();
 //  log.verbose("","Request: " + JSON.stringify(req.body));
@@ -332,3 +334,4 @@ restapp.post(restURI, function(req,res) {
     }
   }
 });
+**/
