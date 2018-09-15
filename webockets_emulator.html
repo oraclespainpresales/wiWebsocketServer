@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<title>IoT Racing - WebSocket events Listener Sample (socket.io)</title>
+<style>
+	.container {
+		width: 1024px;
+		height: 400px;
+		border-style: solid;
+		border-width: 1px;
+		background-color: #b0c4de;
+		overflow-y:scroll;
+		overflow-x:hidden;
+	}
+
+	.courier-font {
+		font-family: 'Courier', sans-serif;
+		font-size: 12px;
+	}
+</style>
+
+<!--<script src="http://localhost:9009/ws/socket.io.js"></script>-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
+
+<script language="javascript" type="text/javascript">
+
+	const namespace = 'msg';
+	const version = "1.0.5";
+	var wsUri;
+	var output;
+	var wsserver = "";
+//	var localwsserver = "helper.digitalpracticespain.com";
+	var localwsserver = "localhost";
+	var payload = new Array();
+
+	function getParameterByName(name) {
+		name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+		var regex = new RegExp("[\\?&]" + name + "=([^&#]*)");
+		var results = regex.exec(location.search);
+		return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+	}
+
+	function populatePayload() {
+		payload["REFRESH"] = "{ \"result\" : 0, \"detail\" : \"Request processed successfully\" }";
+	}
+
+	function init() {
+		document.getElementById('title').innerHTML = document.getElementById('title').innerHTML + version;
+		output = document.getElementById("output");
+		wsserver = getParameterByName('wsserver');
+		if ( wsserver == "")
+			wsserver = localwsserver;
+		document.forms["ConnectForm"]["hostname"].value = wsserver;
+	}
+
+	function connect() {
+
+	  namespaces = document.forms["NamespacesForm"]["namespaces"].value.split(',');
+		protocol = document.forms["ConnectForm"]["protocol"].value;
+		hostname = document.forms["ConnectForm"]["hostname"].value;
+		hostname += ":" + document.forms["ConnectForm"]["demozone"].value;
+		wsUri = protocol + "://" + hostname;
+		writeToScreen("Connecting to " + wsUri);
+		websocket = io.connect(wsUri);
+
+		websocket.on('connect_error', function(err) {
+			writeToScreen("[EVENT] connect_error: " + JSON.stringify(err), "blueviolet");
+		});
+
+		websocket.on('connect_timeout', function() {
+			writeToScreen("[EVENT] Econnect_timeout", "blueviolet");
+		});
+		websocket.on('reconnect', function() {
+			writeToScreen("[EVENT] reconnect", "blueviolet");
+		});
+		websocket.on('reconnect_attempt', function(attempt) {
+			writeToScreen("[EVENT] reconnect_attempt: " + attempt, "blueviolet");
+		});
+		websocket.on('reconnecting', function() {
+			writeToScreen("[EVENT] reconnecting", "blueviolet");
+		});
+		websocket.on('reconnect_error', function(err) {
+			writeToScreen("[EVENT] reconnect_error: " + JSON.stringify(err), "blueviolet");
+		});
+		websocket.on('reconnect_failed', function(err) {
+			writeToScreen("[EVENT] reconnect_failed: " + JSON.stringify(err), "blueviolet");
+		});
+		websocket.on('ping', function() {
+			writeToScreen("[EVENT] Heartbeat", "blueviolet");
+		});
+		websocket.on('connect', function() {
+			writeToScreen("[EVENT] connect", "blueviolet");
+			onOpen();
+		});
+		websocket.on('disconnect', function() {
+			writeToScreen("[EVENT] disconnect", "blueviolet");
+			onClose()
+		});
+		namespaces.forEach(function(namespace) {
+			writeToScreen("Subscribing to namespace: " + namespace, "gray");
+			websocket.on(namespace, function(msg, callback) {
+				onMessage(namespace, msg, callback);
+			});
+		});
+	}
+
+	function disconnect() {
+		writeToScreen("Disconnecting from " + wsUri);
+		websocket.close();
+	}
+
+	function onOpen() {
+		writeToScreen("Successfully connected to " + wsUri, "green");
+		document.getElementById('connectButton').disabled = true;
+		document.getElementById('namespaces').disabled = true;
+		document.getElementById('demozone').disabled = true;
+		document.getElementById('disconnectButton').disabled = false;
+	}
+
+	function onClose() {
+		writeToScreen("Disconnected from " + wsUri, "red");
+		document.getElementById('connectButton').disabled = false;
+		document.getElementById('namespaces').disabled = false;
+		document.getElementById('demozone').disabled = false;
+		document.getElementById('disconnectButton').disabled = true;
+	}
+
+	function onMessage(namespace, msg, callback) {
+		writeToScreen("[" + namespace + "] RECEIVED: " + JSON.stringify(msg), "blue");
+		if (callback) {
+			callback('ack from client');
+		}
+	}
+
+	function doSend(message) {
+		writeToScreen("SENDING: " + message, "blue");
+		websocket.emit(namespace, message, function(msg) {
+			writeToScreen("ACK: " + msg, "yellow");
+		});
+	}
+
+	function writeToScreen(message, color) {
+		var m = message;
+		if ( color != null) {
+			m = '<span style="color: ' + color + ';">' + message + '</span>';
+		}
+		var pre = document.createElement("p");
+		pre.style.display = "inline";
+		msg = getNow() + " " + m;
+		pre.innerHTML = msg;
+		output.appendChild(pre);
+		output.appendChild(document.createElement("br"));
+		scrollToEnd();
+	}
+
+	function scrollToEnd() {
+		var elem = document.getElementById('output');
+		elem.scrollTop = elem.scrollHeight;
+	}
+
+	function send() {
+		doSend(document.forms["MessageForm"]["message"].value);
+	}
+
+	function sendcallback() {
+		doSend(document.getElementById('messageCallback').value);
+	}
+
+	function getNow() {
+		var date = new Date();
+		var hours = "0" + date.getHours();
+		var minutes = "0" + date.getMinutes();
+		var seconds = "0" + date.getSeconds();
+		var milliseconds = "00" + date.getMilliseconds();
+		var formattedTime = '[' + hours.substr(hours.length-2) + ':' + minutes.substr(minutes.length-2) + ':' + seconds.substr(seconds.length-2) + ':' + milliseconds.substr(milliseconds.length-3)  + ']';
+		return formattedTime;
+	}
+
+	function clear() {
+		output.innerHTML = "";
+	}
+
+	window.addEventListener("load", init, false);
+
+</script>
+
+<h2 id=title>IoT Racing - WebSocket events Listener Sample (socket.io) </h2>
+
+<p>
+	<form name="ConnectForm">
+		<input class="courier-font" name="protocol" type="text" size="3" disabled=false value='ws'> <text class="courier-font">://</text>
+		<input class="courier-font" name="hostname" type="text" size="40">
+		<text class="courier-font">:</text>
+		<select id="demozone">
+			<option value="10301">Madrid</option>
+			<option value="10302">Dubai</option>
+		</select>
+		<input type="submit" id="connectButton" formaction="javascript:connect();" value="Connect">
+		<input type="submit" id="disconnectButton" disabled=true formaction="javascript:disconnect();" value="Disconnect">
+	</form>
+	<form action="javascript:disconnect();">
+	</form>
+</p>
+<p>
+
+<form name="NamespacesForm">
+<table class="courier-font">
+  <tr>
+		<td>
+			<span>Namespaces subscribed: </span>
+			<input class="courier-font" id="namespaces" name="namespaces" type="text" size="60" value='XDK'>
+		</td>
+  </tr>
+</table>
+</form>
+<br>
+<form id=ResetOutput name="ResetOutput">
+	<span class="courier-font">OUTPUT WINDOW:</span>
+	<input type="submit" id="clearButton" formaction="javascript:clear();" value="Clear">
+</form>
+<p>
+<div id="output" class="container courier-font">
+</div>
