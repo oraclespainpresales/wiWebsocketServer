@@ -28,8 +28,8 @@
 	var wsUri;
 	var output;
 	var wsserver = "";
-//	var localwsserver = "helper.digitalpracticespain.com";
-	var localwsserver = "localhost";
+	var localwsserver = "infra.digitalpracticespain.com";
+//	var localwsserver = "localhost";
 	var payload = new Array();
 
 	function getParameterByName(name) {
@@ -59,6 +59,7 @@
 		hostname = document.forms["ConnectForm"]["hostname"].value;
 		hostname += ":" + document.forms["ConnectForm"]["demozone"].value;
 		wsUri = protocol + "://" + hostname;
+		wsUri = 'https://wiwsmadrid.ngrok.io'
 		writeToScreen("Connecting to " + wsUri);
 		websocket = io.connect(wsUri);
 
@@ -187,7 +188,7 @@
 
 <p>
 	<form name="ConnectForm">
-		<input class="courier-font" name="protocol" type="text" size="3" disabled=false value='ws'> <text class="courier-font">://</text>
+		<input class="courier-font" name="protocol" type="text" size="3" disabled=false value='https'> <text class="courier-font">://</text>
 		<input class="courier-font" name="hostname" type="text" size="40">
 		<text class="courier-font">:</text>
 		<select id="demozone">

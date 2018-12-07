@@ -169,49 +169,56 @@ function startKafka(cb) {
     log.info(KAFKA, "Server disconnected!");
   });
 
-  kafkaConsumer = new Consumer(
-    kafkaClient, [ { topic: kafkaSetup.topic, partition: 0 } ], { autoCommit: true }
-  );
+  async.eachSeries(demozones, (demozone,next) => {
+    var d = kafkaSetup.topic.replace('{demozone}', demozone.id.toLowerCase()) ;
+    log.verbose(KAFKA, "Starting consumer in topic '%s'", d);
+    kafkaConsumer = new Consumer(
+      kafkaClient, [ { topic: d, partition: 0 } ], { autoCommit: true }
+    );
 
-  kafkaConsumer.on('message', data => {
-    log.verbose(KAFKA, "Incoming message on topic '%s', payload: %s", data.topic, data.value);
-    try {
-      var message = JSON.parse(data.value);
-      if (!message.payload) {
-        log.error(KAFKA, "Message does not contain 'payload'. Ignoring");
-        return;
+    kafkaConsumer.on('message', data => {
+      log.verbose(KAFKA, "Incoming message on topic '%s', payload: %s", data.topic, data.value);
+      try {
+        var message = JSON.parse(data.value);
+        if (!message.payload) {
+          log.error(KAFKA, "Message does not contain 'payload'. Ignoring");
+          return;
+        }
+        if (!message.demozone) {
+          log.error(KAFKA, "Message does not contain 'demozone'. Ignoring");
+          return;
+        }
+        message.demozone = message.demozone.toUpperCase();
+        var server = _.find(servers, { 'demozone': message.demozone });
+        if (!server) {
+          log.error(KAFKA, "Incoming demozone '%s' not registered. Ignoring", message.demozone);
+          return;
+        }
+        if (!message.eventname) {
+          log.error(KAFKA, "Message does not contain 'eventname'. Ignoring");
+          return;
+        }
+        if (server.clients > 0) {
+          log.verbose(WEBSOCKET,"Sending event to %s (%s, %d): %j", message.eventname, message.demozone, server.port, message.payload);
+          server.io.sockets.emit(message.eventname, message.payload);
+        }
+      } catch(e) {
+        log.error(KAFKA, "Error parsing incoming message. Not a valid JSON object");
       }
-      if (!message.demozone) {
-        log.error(KAFKA, "Message does not contain 'demozone'. Ignoring");
-        return;
-      }
-      message.demozone = message.demozone.toUpperCase();
-      var server = _.find(servers, { 'demozone': message.demozone });
-      if (!server) {
-        log.error(KAFKA, "Incoming demozone '%s' not registered. Ignoring", message.demozone);
-        return;
-      }
-      if (!message.eventname) {
-        log.error(KAFKA, "Message does not contain 'eventname'. Ignoring");
-        return;
-      }
-      if (server.clients > 0) {
-        log.verbose(WEBSOCKET,"Sending event to %s (%s, %d): %j", message.eventname, message.demozone, server.port, message.payload);
-        server.io.sockets.emit(message.eventname, message.payload);
-      }
-    } catch(e) {
-      log.error(KAFKA, "Error parsing incoming message. Not a valid JSON object");
-    }
-  });
+    });
 
-  kafkaConsumer.on('ready', () => {
-    log.error(KAFKA, "Consumer ready");
-  });
+    kafkaConsumer.on('ready', () => {
+      log.error(KAFKA, "Consumer ready");
+    });
 
-  kafkaConsumer.on('error', err => {
-    log.error(KAFKA, "Error initializing KAFKA consumer: " + err.message);
+    kafkaConsumer.on('error', err => {
+      log.error(KAFKA, "Error initializing KAFKA consumer: " + err.message);
+    });
+
+    next();
+  }, (err) => {
+    if (typeof(cb) == 'function') cb();
   });
-  if (typeof(cb) == 'function') cb();
 }
 
 function stopKafka(cb) {
